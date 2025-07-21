@@ -340,3 +340,51 @@
     executed: bool
   }
 )
+
+(define-data-var next-allocation-id uint u0)
+
+;; Time-lock mechanism
+(define-map time-locks
+  {proposal-id: uint}
+  {
+    execution-block: uint,
+    executed: bool
+  }
+)
+
+;; Time-locked proposal execution 
+(define-public (schedule-time-locked-execution (proposal-id uint) (delay-blocks uint))
+  (let 
+    (
+      (proposal (unwrap! (map-get? proposals {proposal-id: proposal-id}) ERR-INVALID-PROPOSAL))
+      (current-block stacks-block-height)
+      (total-tokens (var-get total-governance-tokens))
+    )
+    ;; Validation Checks
+    (asserts! (>= current-block (get end-block proposal)) ERR-PROPOSAL-CLOSED)
+    (asserts! (not (get executed proposal)) ERR-UNAUTHORIZED)
+    
+    ;; Quorum and Threshold Validation
+    (let 
+      (
+        (total-votes (+ (get vote-for proposal) (get vote-against proposal)))
+        (quorum-percentage (/ (* total-votes u100) total-tokens))
+        (vote-for-percentage (/ (* (get vote-for proposal) u100) total-votes))
+      )
+      ;; Check Quorum and Pass Thresholds
+      (asserts! (>= quorum-percentage (get quorum-threshold proposal)) ERR-PROPOSAL-EXECUTION-FAILED)
+      (asserts! (>= vote-for-percentage (get pass-threshold proposal)) ERR-PROPOSAL-EXECUTION-FAILED)
+      
+      ;; Schedule execution with time lock
+      (map-set time-locks
+        {proposal-id: proposal-id}
+        {
+          execution-block: (+ current-block delay-blocks),
+          executed: false
+        }
+      )
+      
+      (ok true)
+    )
+  )
+)
