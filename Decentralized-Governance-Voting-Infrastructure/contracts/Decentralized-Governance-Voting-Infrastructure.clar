@@ -524,3 +524,64 @@
     (ok true)
   )
 )
+
+;; Comprehensive governance parameter update
+(define-public (update-governance-parameters
+  (new-min-proposal-duration (optional uint))
+  (new-max-proposal-duration (optional uint))
+  (new-proposal-submission-min-tokens (optional uint))
+  (new-treasury-max-per-proposal (optional uint))
+)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-UNAUTHORIZED)
+    
+    ;; Update parameters if provided
+    (if (is-some new-min-proposal-duration)
+      (var-set min-proposal-duration (unwrap-panic new-min-proposal-duration))
+      true
+    )
+    
+    (if (is-some new-max-proposal-duration)
+      (var-set max-proposal-duration (unwrap-panic new-max-proposal-duration))
+      true
+    )
+    
+    (if (is-some new-proposal-submission-min-tokens)
+      (var-set proposal-submission-min-tokens (unwrap-panic new-proposal-submission-min-tokens))
+      true
+    )
+    
+    (if (is-some new-treasury-max-per-proposal)
+      (var-set treasury-max-per-proposal (unwrap-panic new-treasury-max-per-proposal))
+      true
+    )
+    
+    (ok true)
+  )
+)
+
+;; Enhanced governance metrics
+(define-read-only (get-enhanced-governance-metrics)
+  {
+    total-governance-tokens: (var-get total-governance-tokens),
+    total-proposals: (var-get next-proposal-id),
+    contract-paused: (var-get contract-paused),
+    treasury-balance: (var-get treasury-balance),
+    min-proposal-duration: (var-get min-proposal-duration),
+    max-proposal-duration: (var-get max-proposal-duration),
+    proposal-submission-min-tokens: (var-get proposal-submission-min-tokens),
+    treasury-max-per-proposal: (var-get treasury-max-per-proposal)
+  }
+)
+
+;; Vote by signature verification (future integration)
+(define-read-only (verify-vote-signature 
+  (signer principal) 
+  (proposal-id uint) 
+  (vote-type uint)
+  (signature (buff 65))
+  (message-hash (buff 32))
+)
+  
+  (ok true)
+)
