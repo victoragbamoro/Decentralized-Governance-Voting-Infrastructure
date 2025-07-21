@@ -491,3 +491,36 @@
     (ok proposal-id)
   )
 )
+
+;; Execute treasury allocation
+(define-public (execute-treasury-allocation (allocation-id uint))
+  (let 
+    (
+      (allocation (unwrap! (map-get? treasury-allocations {allocation-id: allocation-id}) ERR-INVALID-PROPOSAL))
+      (proposal-id (get proposal-id allocation))
+      (proposal (unwrap! (map-get? proposals {proposal-id: proposal-id}) ERR-INVALID-PROPOSAL))
+    )
+    ;; Validation Checks
+    (asserts! (get executed proposal) ERR-UNAUTHORIZED)
+    (asserts! (is-some (get execution-result proposal)) ERR-UNAUTHORIZED)
+    (asserts! (unwrap-panic (get execution-result proposal)) ERR-UNAUTHORIZED)
+    (asserts! (not (get executed allocation)) ERR-UNAUTHORIZED)
+    
+    ;; Execute Treasury Transfer
+    (try! (as-contract (ft-transfer? governance-token 
+                                    (get amount allocation) 
+                                    tx-sender 
+                                    (get recipient allocation))))
+    
+    ;; Update Treasury Balance
+    (var-set treasury-balance (- (var-get treasury-balance) (get amount allocation)))
+    
+    ;; Update Allocation Status
+    (map-set treasury-allocations
+      {allocation-id: allocation-id}
+      (merge allocation {executed: true})
+    )
+    
+    (ok true)
+  )
+)
