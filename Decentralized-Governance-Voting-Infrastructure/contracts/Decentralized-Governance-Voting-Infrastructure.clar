@@ -87,3 +87,52 @@
     (ok true)
   )
 )
+
+;; Create a New Proposal
+(define-public (create-proposal 
+  (title (string-utf8 100)) 
+  (description (string-utf8 500))
+  (proposal-type (string-ascii 20))
+  (duration uint)
+  (quorum-threshold uint)
+  (pass-threshold uint)
+)
+  (let 
+    (
+      (proposal-id (var-get next-proposal-id))
+      (current-block stacks-block-height)
+    )
+    ;; Validation Checks
+    (asserts! (> (ft-get-balance governance-token tx-sender) u0) ERR-INSUFFICIENT-TOKENS)
+    (asserts! (or 
+      (is-eq proposal-type (get GOVERNANCE PROPOSAL-TYPES))
+      (is-eq proposal-type (get TREASURY PROPOSAL-TYPES))
+      (is-eq proposal-type (get PARAMETER-UPDATE PROPOSAL-TYPES))
+      (is-eq proposal-type (get ECOSYSTEM PROPOSAL-TYPES))
+    ) ERR-INVALID-PROPOSAL)
+    
+    ;; Store Proposal
+    (map-set proposals 
+      {proposal-id: proposal-id}
+      {
+        title: title,
+        description: description,
+        proposed-by: tx-sender,
+        start-block: current-block,
+        end-block: (+ current-block duration),
+        proposal-type: proposal-type,
+        vote-for: u0,
+        vote-against: u0,
+        executed: false,
+        execution-result: none,
+        quorum-threshold: quorum-threshold,
+        pass-threshold: pass-threshold
+      }
+    )
+    
+    ;; Increment Proposal ID
+    (var-set next-proposal-id (+ proposal-id u1))
+    
+    (ok proposal-id)
+  )
+)
