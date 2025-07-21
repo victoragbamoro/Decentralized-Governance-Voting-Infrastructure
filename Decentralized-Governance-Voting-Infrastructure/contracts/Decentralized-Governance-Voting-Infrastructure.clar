@@ -388,3 +388,106 @@
     )
   )
 )
+
+;; Execute time-locked proposal
+(define-public (execute-time-locked-proposal (proposal-id uint))
+  (let 
+    (
+      (proposal (unwrap! (map-get? proposals {proposal-id: proposal-id}) ERR-INVALID-PROPOSAL))
+      (time-lock (unwrap! (map-get? time-locks {proposal-id: proposal-id}) ERR-INVALID-TIMELOCK))
+      (current-block stacks-block-height)
+    )
+    ;; Validation Checks
+    (asserts! (not (get executed proposal)) ERR-UNAUTHORIZED)
+    (asserts! (not (get executed time-lock)) ERR-UNAUTHORIZED)
+    (asserts! (>= current-block (get execution-block time-lock)) ERR-INVALID-TIMELOCK)
+    
+    ;; Update Time Lock Status
+    (map-set time-locks
+      {proposal-id: proposal-id}
+      (merge time-lock {executed: true})
+    )
+    
+    ;; Update Proposal Status
+    (map-set proposals 
+      {proposal-id: proposal-id}
+      (merge proposal 
+        {
+          executed: true,
+          execution-result: (some true)
+        }
+      )
+    )
+    
+    (ok true)
+  )
+)
+
+;; Treasury management functions
+(define-public (deposit-to-treasury (amount uint))
+  (begin
+    (try! (ft-transfer? governance-token amount tx-sender (as-contract tx-sender)))
+    (var-set treasury-balance (+ (var-get treasury-balance) amount))
+    (ok true)
+  )
+)
+
+;; Create treasury allocation proposal
+(define-public (create-treasury-proposal 
+  (title (string-utf8 100)) 
+  (description (string-utf8 500))
+  (duration uint)
+  (quorum-threshold uint)
+  (pass-threshold uint)
+  (recipient principal)
+  (amount uint)
+)
+  (let 
+    (
+      (proposal-id (var-get next-proposal-id))
+      (current-block stacks-block-height)
+      (user-token-balance (ft-get-balance governance-token tx-sender))
+    )
+    ;; Validation Checks
+    (asserts! (>= user-token-balance (var-get proposal-submission-min-tokens)) ERR-INSUFFICIENT-TOKENS)
+    (asserts! (<= amount (var-get treasury-max-per-proposal)) ERR-TREASURY-LIMIT-EXCEEDED)
+    (asserts! (<= amount (var-get treasury-balance)) ERR-TREASURY-LIMIT-EXCEEDED)
+    (asserts! (and (>= duration (var-get min-proposal-duration)) (<= duration (var-get max-proposal-duration))) ERR-INVALID-PROPOSAL)
+    
+    ;; Store Proposal
+    (map-set proposals 
+      {proposal-id: proposal-id}
+      {
+        title: title,
+        description: description,
+        proposed-by: tx-sender,
+        start-block: current-block,
+        end-block: (+ current-block duration),
+        proposal-type: (get TREASURY PROPOSAL-TYPES),
+        vote-for: u0,
+        vote-against: u0,
+        executed: false,
+        execution-result: none,
+        quorum-threshold: quorum-threshold,
+        pass-threshold: pass-threshold
+      }
+    )
+    
+    ;; Create Treasury Allocation
+    (map-set treasury-allocations
+      {allocation-id: (var-get next-allocation-id)}
+      {
+        proposal-id: proposal-id,
+        recipient: recipient,
+        amount: amount,
+        executed: false
+      }
+    )
+    
+    ;; Increment IDs
+    (var-set next-proposal-id (+ proposal-id u1))
+    (var-set next-allocation-id (+ (var-get next-allocation-id) u1))
+    
+    (ok proposal-id)
+  )
+)
