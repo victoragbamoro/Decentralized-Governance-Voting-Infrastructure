@@ -293,3 +293,50 @@
     (ok (var-get contract-paused))
   )
 )
+
+;; Advanced Governance Metrics
+(define-read-only (get-governance-metrics)
+  {
+    total-governance-tokens: (var-get total-governance-tokens),
+    total-proposals: (var-get next-proposal-id),
+    contract-paused: (var-get contract-paused)
+  }
+)
+
+;; Token Burning Mechanism (Optional)
+(define-public (burn-governance-tokens (amount uint))
+  (begin
+    (try! (ft-burn? governance-token amount tx-sender))
+    (var-set total-governance-tokens 
+      (- (var-get total-governance-tokens) amount)
+    )
+    (ok true)
+  )
+)
+
+;; NEW FEATURE: Vote Types (beyond simple yes/no)
+(define-constant VOTE-TYPES 
+  {
+    FOR: u1,
+    AGAINST: u2,
+    ABSTAIN: u3
+  }
+)
+
+;; Governance configuration variables
+(define-data-var min-proposal-duration uint u144) ;; Default: ~1 day at 10 min block times
+(define-data-var max-proposal-duration uint u4320) ;; Default: ~30 days at 10 min block times
+(define-data-var proposal-submission-min-tokens uint u100000) ;; Minimum tokens to submit proposal
+(define-data-var treasury-max-per-proposal uint u100000000) ;; 10% of total token supply
+
+;; Treasury management
+(define-data-var treasury-balance uint u0)
+(define-map treasury-allocations
+  {allocation-id: uint}
+  {
+    proposal-id: uint,
+    recipient: principal,
+    amount: uint,
+    executed: bool
+  }
+)
